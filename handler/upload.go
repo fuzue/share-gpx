@@ -20,6 +20,9 @@ type UploadHandler struct {
 }
 
 func NewUpload(apiKey string, db *store.DB, files *store.FileStore, publicURL string) *UploadHandler {
+	if apiKey == "" {
+		panic("upload handler: apiKey must not be empty")
+	}
 	return &UploadHandler{apiKey: apiKey, db: db, files: files, publicURL: publicURL}
 }
 
