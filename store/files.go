@@ -32,3 +32,10 @@ func (f *FileStore) Read(uuid string) ([]byte, error) {
 	}
 	return os.ReadFile(filepath.Join(f.dir, uuid+".gpx"))
 }
+
+func (f *FileStore) Remove(uuid string) error {
+	if strings.ContainsAny(uuid, "/\\") {
+		return fmt.Errorf("invalid uuid: %q", uuid)
+	}
+	return os.Remove(filepath.Join(f.dir, uuid+".gpx"))
+}

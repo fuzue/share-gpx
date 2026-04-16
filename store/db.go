@@ -24,6 +24,7 @@ func NewDB(path string) (*DB, error) {
 	if err != nil {
 		return nil, err
 	}
+	db.SetMaxOpenConns(1)
 	if _, err := db.Exec(`CREATE TABLE IF NOT EXISTS trails (
 		uuid        TEXT PRIMARY KEY,
 		filename    TEXT NOT NULL,

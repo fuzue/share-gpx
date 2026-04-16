@@ -6,6 +6,7 @@ import (
 	"log"
 	"net/http"
 	"os"
+	"path/filepath"
 
 	"github.com/go-chi/chi/v5"
 	"maps.vaz.io/share-gpx/handler"
@@ -21,7 +22,7 @@ func main() {
 	port := envOr("PORT", "8080")
 	publicURL := envOr("PUBLIC_URL", "http://localhost:"+port)
 
-	db, err := store.NewDB(dataDir + "/trails.db")
+	db, err := store.NewDB(filepath.Join(dataDir, "trails.db"))
 	if err != nil {
 		log.Fatalf("open db: %v", err)
 	}

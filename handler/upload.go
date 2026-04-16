@@ -1,6 +1,7 @@
 package handler
 
 import (
+	"crypto/subtle"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -28,7 +29,7 @@ func NewUpload(apiKey string, db *store.DB, files *store.FileStore, publicURL st
 }
 
 func (h *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
-	if r.Header.Get("X-API-Key") != h.apiKey {
+	if subtle.ConstantTimeCompare([]byte(r.Header.Get("X-API-Key")), []byte(h.apiKey)) != 1 {
 		http.Error(w, "unauthorized", http.StatusUnauthorized)
 		return
 	}
@@ -69,6 +70,7 @@ func (h *UploadHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 		UploadedAt: time.Now().UTC(),
 		SizeBytes:  int64(len(data)),
 	}); err != nil {
+		_ = h.files.Remove(id)
 		http.Error(w, "failed to save metadata", http.StatusInternalServerError)
 		return
 	}
