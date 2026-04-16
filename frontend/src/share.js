@@ -20,14 +20,13 @@ export async function renderShare(app, uuid) {
     <div class="share-wrapper">
       <div id="map" class="map">
         <div class="stats-overlay" id="statsOverlay"></div>
+        <div id="mapLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;pointer-events:none;color:#aaa;font-size:14px;">Loading trail…</div>
       </div>
       <div class="chart-panel">
         <canvas id="elevChart"></canvas>
       </div>
     </div>
   `
-
-  document.getElementById('map').textContent = 'Loading trail…'
 
   let trail
   try {
@@ -39,6 +38,7 @@ export async function renderShare(app, uuid) {
     return
   }
 
+  document.getElementById('mapLoading')?.remove()
   document.title = trail.filename || 'GPX Trail'
 
   const map = L.map('map')
