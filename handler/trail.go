@@ -2,6 +2,7 @@ package handler
 
 import (
 	"encoding/json"
+	"log"
 	"net/http"
 
 	"github.com/go-chi/chi/v5"
@@ -53,12 +54,14 @@ func (h *TrailHandler) ServeHTTP(w http.ResponseWriter, r *http.Request) {
 	}
 
 	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(trailResponse{
+	if err := json.NewEncoder(w).Encode(trailResponse{
 		GeoJSON:          parsed.GeoJSON,
 		Filename:         trail.Filename,
 		DistanceKm:       parsed.DistanceKm,
 		ElevationGainM:   parsed.ElevationGainM,
 		DurationMin:      parsed.DurationMin,
 		ElevationProfile: parsed.ElevationProfile,
-	})
+	}); err != nil {
+		log.Printf("trail encode: %v", err)
+	}
 }

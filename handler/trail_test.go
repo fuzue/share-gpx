@@ -72,6 +72,42 @@ func TestTrail_Success(t *testing.T) {
 	if resp["elevation_profile"] == nil {
 		t.Error("expected elevation_profile in response")
 	}
+	if resp["elevation_gain_m"] == nil {
+		t.Error("expected elevation_gain_m in response")
+	}
+	if resp["duration_min"] == nil {
+		t.Error("expected duration_min in response (fixture GPX has timestamps)")
+	}
+}
+
+func TestTrail_ParseError(t *testing.T) {
+	db, err := store.NewDB(":memory:")
+	if err != nil {
+		t.Fatalf("NewDB: %v", err)
+	}
+	t.Cleanup(func() { db.Close() })
+
+	fs, err := store.NewFileStore(t.TempDir())
+	if err != nil {
+		t.Fatalf("NewFileStore: %v", err)
+	}
+
+	badUUID := "bbbbcccc-dddd-eeee-ffff-aaaaaaaaaaaa"
+	if err := fs.Save(badUUID, []byte("not valid xml")); err != nil {
+		t.Fatalf("Save: %v", err)
+	}
+	if err := db.Insert(store.Trail{UUID: badUUID, Filename: "bad.gpx", SizeBytes: 13}); err != nil {
+		t.Fatalf("Insert: %v", err)
+	}
+
+	h := handler.NewTrail(db, fs)
+	req := chiRequest(http.MethodGet, "/api/trail/"+badUUID, "uuid", badUUID)
+	rr := httptest.NewRecorder()
+	h.ServeHTTP(rr, req)
+
+	if rr.Code != http.StatusInternalServerError {
+		t.Errorf("status: got %d, want 500", rr.Code)
+	}
 }
 
 func TestTrail_NotFound(t *testing.T) {
