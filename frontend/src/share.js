@@ -64,7 +64,6 @@ export async function renderShare(app, uuid) {
 
   const stats = document.getElementById('statsOverlay')
   stats.textContent = ''
-
   const statParts = [
     `📏 ${trail.distance_km} km`,
     `⛰️ ${trail.elevation_gain_m} m ↑`,
@@ -80,11 +79,69 @@ export async function renderShare(app, uuid) {
     stats.appendChild(span)
   })
 
+  // Cursor dot shown on map during hover/touch sync
+  const cursorMarker = L.circleMarker([0, 0], {
+    radius: 6,
+    color: '#fff',
+    fillColor: '#f39c12',
+    fillOpacity: 1,
+    weight: 2,
+    interactive: false,
+  }).addTo(map)
+  cursorMarker.setOpacity(0)
+
+  // "X.XX km from start · NNN m" label shown inside the map during sync
+  const cursorInfo = document.createElement('div')
+  cursorInfo.style.cssText = 'position:absolute;bottom:12px;left:12px;z-index:1001;background:rgba(0,0,0,0.75);color:#fff;padding:4px 10px;border-radius:4px;font-size:13px;display:none;pointer-events:none'
+  document.getElementById('map').appendChild(cursorInfo)
+
   const elevProfile = trail.elevation_profile ?? []
+  let chart = null
+
+  function moveCursor(idx) {
+    const c = coords[idx]
+    const ep = elevProfile[idx]
+    if (!c) return
+    cursorMarker.setLatLng(c).setOpacity(1)
+    if (ep) {
+      cursorInfo.textContent = `${ep.dist_km.toFixed(2)} km from start · ${Math.round(ep.ele_m)} m`
+      cursorInfo.style.display = 'block'
+    }
+    if (chart) {
+      const meta = chart.getDatasetMeta(0)
+      const pt = meta.data[idx]
+      chart.tooltip.setActiveElements(
+        [{ datasetIndex: 0, index: idx }],
+        pt ? { x: pt.x, y: pt.y } : { x: 0, y: 0 },
+      )
+      chart.update('none')
+    }
+  }
+
+  function hideCursor() {
+    cursorMarker.setOpacity(0)
+    cursorInfo.style.display = 'none'
+    if (chart) {
+      chart.tooltip.setActiveElements([], { x: 0, y: 0 })
+      chart.update('none')
+    }
+  }
+
+  // Map mouse hover → sync chart
+  map.on('mousemove', (e) => {
+    let minDist = Infinity, closestIdx = 0
+    for (let i = 0; i < coords.length; i++) {
+      const d = map.distance(coords[i], e.latlng)
+      if (d < minDist) { minDist = d; closestIdx = i }
+    }
+    moveCursor(closestIdx)
+  })
+  map.on('mouseout', hideCursor)
+
   const labels = elevProfile.map(p => p.dist_km.toFixed(1))
   const data = elevProfile.map(p => p.ele_m)
 
-  new Chart(document.getElementById('elevChart'), {
+  chart = new Chart(document.getElementById('elevChart'), {
     type: 'line',
     data: {
       labels,
@@ -102,7 +159,23 @@ export async function renderShare(app, uuid) {
       responsive: true,
       maintainAspectRatio: false,
       animation: false,
-      plugins: { legend: { display: false } },
+      interaction: { mode: 'index', intersect: false },
+      onHover: (_event, activeElements) => {
+        if (activeElements.length > 0) {
+          moveCursor(activeElements[0].index)
+        } else {
+          hideCursor()
+        }
+      },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            title: (items) => `${items[0].label} km`,
+            label: (item) => `${Math.round(item.raw)} m`,
+          },
+        },
+      },
       scales: {
         x: {
           title: { display: true, text: 'Distance (km)', color: '#888' },
