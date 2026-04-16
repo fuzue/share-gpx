@@ -1,5 +1,6 @@
 dist/*
-!dist/placeholder
+!dist/index.html
+!dist/assets/
 frontend/node_modules/
 share-gpx
 /data/
