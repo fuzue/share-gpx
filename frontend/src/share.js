@@ -1,11 +1,11 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
-import { Chart, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
+import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
 import markerShadow from 'leaflet/dist/images/marker-shadow.png'
 
-Chart.register(LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
+Chart.register(LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip)
 
 // Fix default icon resolution with bundlers by using explicit asset imports
 delete L.Icon.Default.prototype._getIconUrl
