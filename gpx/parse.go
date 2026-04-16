@@ -2,6 +2,7 @@ package gpx
 
 import (
 	"encoding/xml"
+	"fmt"
 	"math"
 	"time"
 )
@@ -73,6 +74,10 @@ func Parse(data []byte) (*ParseResult, error) {
 				pts = append(pts, p)
 			}
 		}
+	}
+
+	if len(pts) == 0 {
+		return nil, fmt.Errorf("GPX file contains no track points")
 	}
 
 	return &ParseResult{

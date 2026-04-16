@@ -90,6 +90,14 @@ func TestParse_GeoJSON(t *testing.T) {
 	}
 }
 
+func TestParse_EmptyTrack(t *testing.T) {
+	emptyGPX := `<?xml version="1.0"?><gpx version="1.1" xmlns="http://www.topografix.com/GPX/1/1"><trk><trkseg></trkseg></trk></gpx>`
+	_, err := gpx.Parse([]byte(emptyGPX))
+	if err == nil {
+		t.Error("expected error for GPX with no track points, got nil")
+	}
+}
+
 func TestParse_ElevationProfile(t *testing.T) {
 	r, err := gpx.Parse([]byte(sampleGPX))
 	if err != nil {
