@@ -98,11 +98,12 @@ export async function renderShare(app, uuid) {
   const elevProfile = trail.elevation_profile ?? []
   let chart = null
 
-  function moveCursor(idx) {
+  function moveCursor(idx, centerMap = false) {
     const c = coords[idx]
     const ep = elevProfile[idx]
     if (!c) return
     cursorMarker.setLatLng(c).setStyle({ opacity: 1, fillOpacity: 1 })
+    if (centerMap) map.setView(c, map.getZoom(), { animate: false })
     if (ep) {
       cursorInfo.textContent = `${ep.dist_km.toFixed(2)} km from start · ${Math.round(ep.ele_m)} m`
       cursorInfo.style.display = 'block'
@@ -162,7 +163,7 @@ export async function renderShare(app, uuid) {
       interaction: { mode: 'index', intersect: false },
       onHover: (_event, activeElements) => {
         if (activeElements.length > 0) {
-          moveCursor(activeElements[0].index)
+          moveCursor(activeElements[0].index, true)
         } else {
           hideCursor()
         }
