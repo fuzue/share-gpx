@@ -1,5 +1,5 @@
 dist/*
-!dist/.gitkeep
+!dist/placeholder
 frontend/node_modules/
 share-gpx
 /data/
