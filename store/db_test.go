@@ -41,6 +41,9 @@ func TestDB_InsertAndGet(t *testing.T) {
 	if got.SizeBytes != trail.SizeBytes {
 		t.Errorf("SizeBytes: got %d, want %d", got.SizeBytes, trail.SizeBytes)
 	}
+	if !got.UploadedAt.Equal(trail.UploadedAt) {
+		t.Errorf("UploadedAt: got %v, want %v", got.UploadedAt, trail.UploadedAt)
+	}
 }
 
 func TestDB_GetMissing(t *testing.T) {

@@ -2,6 +2,7 @@ package store
 
 import (
 	"database/sql"
+	"errors"
 	"time"
 
 	_ "modernc.org/sqlite"
@@ -48,7 +49,7 @@ func (d *DB) Get(uuid string) (*Trail, error) {
 	err := d.db.QueryRow(
 		`SELECT uuid, filename, uploaded_at, size_bytes FROM trails WHERE uuid = ?`, uuid,
 	).Scan(&t.UUID, &t.Filename, &t.UploadedAt, &t.SizeBytes)
-	if err == sql.ErrNoRows {
+	if errors.Is(err, sql.ErrNoRows) {
 		return nil, nil
 	}
 	if err != nil {
