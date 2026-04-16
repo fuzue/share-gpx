@@ -22,6 +22,10 @@ func main() {
 	port := envOr("PORT", "8080")
 	publicURL := envOr("PUBLIC_URL", "http://localhost:"+port)
 
+	if err := os.MkdirAll(dataDir, 0755); err != nil {
+		log.Fatalf("create data dir: %v", err)
+	}
+
 	db, err := store.NewDB(filepath.Join(dataDir, "trails.db"))
 	if err != nil {
 		log.Fatalf("open db: %v", err)
