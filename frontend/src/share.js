@@ -88,7 +88,7 @@ export async function renderShare(app, uuid) {
     weight: 2,
     interactive: false,
   }).addTo(map)
-  cursorMarker.setOpacity(0)
+  cursorMarker.setStyle({ opacity: 0, fillOpacity: 0 })
 
   // "X.XX km from start · NNN m" label shown inside the map during sync
   const cursorInfo = document.createElement('div')
@@ -102,7 +102,7 @@ export async function renderShare(app, uuid) {
     const c = coords[idx]
     const ep = elevProfile[idx]
     if (!c) return
-    cursorMarker.setLatLng(c).setOpacity(1)
+    cursorMarker.setLatLng(c).setStyle({ opacity: 1, fillOpacity: 1 })
     if (ep) {
       cursorInfo.textContent = `${ep.dist_km.toFixed(2)} km from start · ${Math.round(ep.ele_m)} m`
       cursorInfo.style.display = 'block'
@@ -119,7 +119,7 @@ export async function renderShare(app, uuid) {
   }
 
   function hideCursor() {
-    cursorMarker.setOpacity(0)
+    cursorMarker.setStyle({ opacity: 0, fillOpacity: 0 })
     cursorInfo.style.display = 'none'
     if (chart) {
       chart.tooltip.setActiveElements([], { x: 0, y: 0 })
