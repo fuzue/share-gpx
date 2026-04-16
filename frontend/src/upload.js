@@ -24,6 +24,10 @@ export function renderUpload(app) {
   apiKeyInput.value = localStorage.getItem('gpx-api-key') || ''
   let selectedFile = null
 
+  function updateBtn() {
+    uploadBtn.disabled = !selectedFile || !apiKeyInput.value.trim()
+  }
+
   dropZone.addEventListener('click', (e) => {
     if (e.target !== document.querySelector('label[for="fileInput"]')) {
       fileInput.click()
@@ -35,7 +39,11 @@ export function renderUpload(app) {
     dropZone.classList.add('drag-over')
   })
 
-  dropZone.addEventListener('dragleave', () => dropZone.classList.remove('drag-over'))
+  dropZone.addEventListener('dragleave', (e) => {
+    if (!dropZone.contains(e.relatedTarget)) {
+      dropZone.classList.remove('drag-over')
+    }
+  })
 
   dropZone.addEventListener('drop', (e) => {
     e.preventDefault()
@@ -43,6 +51,10 @@ export function renderUpload(app) {
     const file = e.dataTransfer.files[0]
     if (file && file.name.toLowerCase().endsWith('.gpx')) {
       setFile(file)
+    } else if (file) {
+      const original = dropLabel.textContent
+      dropLabel.textContent = 'Only .gpx files are accepted'
+      setTimeout(() => { dropLabel.textContent = original }, 2500)
     }
   })
 
@@ -58,9 +70,7 @@ export function renderUpload(app) {
 
   apiKeyInput.addEventListener('input', updateBtn)
 
-  function updateBtn() {
-    uploadBtn.disabled = !selectedFile || !apiKeyInput.value.trim()
-  }
+  updateBtn()
 
   uploadBtn.addEventListener('click', async () => {
     const key = apiKeyInput.value.trim()
@@ -86,17 +96,33 @@ export function renderUpload(app) {
 
       const { url } = await res.json()
       result.classList.remove('hidden')
-      result.innerHTML = `
-        <span>Trail shared!</span>
-        <a href="${url}" target="_blank">${url}</a>
-        <button id="copyBtn">Copy link</button>
-      `
-      document.getElementById('copyBtn').addEventListener('click', function () {
-        navigator.clipboard.writeText(url).then(() => { this.textContent = 'Copied!' })
+      result.textContent = ''
+
+      const label = document.createElement('span')
+      label.textContent = 'Trail shared!'
+      result.appendChild(label)
+
+      const link = document.createElement('a')
+      link.href = url
+      link.textContent = url
+      link.target = '_blank'
+      link.rel = 'noopener noreferrer'
+      result.appendChild(link)
+
+      const copyBtn = document.createElement('button')
+      copyBtn.id = 'copyBtn'
+      copyBtn.textContent = 'Copy link'
+      copyBtn.addEventListener('click', function () {
+        navigator.clipboard.writeText(url).then(() => { this.textContent = 'Copied!' }).catch(() => {})
       })
+      result.appendChild(copyBtn)
     } catch (err) {
       result.classList.remove('hidden')
-      result.innerHTML = `<span class="error">Upload failed: ${err.message}</span>`
+      result.textContent = ''
+      const errSpan = document.createElement('span')
+      errSpan.className = 'error'
+      errSpan.textContent = `Upload failed: ${err.message}`
+      result.appendChild(errSpan)
     } finally {
       uploadBtn.disabled = false
       uploadBtn.textContent = 'Upload'
