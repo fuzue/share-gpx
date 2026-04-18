@@ -73,6 +73,14 @@ export async function renderShare(app, uuid) {
     return
   }
 
+  if (coords.length <= 1) {
+    const btn = document.getElementById('toggleView')
+    btn.disabled = true
+    btn.title = 'Not enough trackpoints for 3D view'
+    btn.style.opacity = '0.4'
+    btn.style.cursor = 'not-allowed'
+  }
+
   const polyline = L.polyline(coords, { color: '#e74c3c', weight: 3 }).addTo(map)
   map.fitBounds(polyline.getBounds(), { padding: [40, 40] })
 
@@ -375,4 +383,31 @@ export async function renderShare(app, uuid) {
   })
 
   document.getElementById('playPauseBtn').addEventListener('click', togglePlay)
+
+  let mode = '2d'
+
+  document.getElementById('toggleView').addEventListener('click', () => {
+    if (mode === '2d') {
+      mode = '3d'
+      document.getElementById('map').classList.add('hidden')
+      document.getElementById('map3d').classList.remove('hidden')
+      document.getElementById('playbackOverlay').classList.remove('hidden')
+      document.getElementById('toggleView').textContent = '2D'
+      initMap3D()
+      if (map3dReady) map3d.resize()
+    } else {
+      mode = '2d'
+      if (playing) {
+        playing = false
+        cancelAnimationFrame(animFrame)
+        animFrame = null
+        document.getElementById('playPauseBtn').textContent = '▶'
+      }
+      document.getElementById('map3d').classList.add('hidden')
+      document.getElementById('map').classList.remove('hidden')
+      document.getElementById('playbackOverlay').classList.add('hidden')
+      document.getElementById('toggleView').textContent = '3D'
+      map.invalidateSize()
+    }
+  })
 }
