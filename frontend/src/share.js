@@ -252,6 +252,39 @@ export async function renderShare(app, uuid) {
     }
   }
 
+  let playing = false
+  let currentIdx = 0
+  let animFrame = null
+
+  function playbackStep() {
+    const speed = parseInt(document.getElementById('speedSelect')?.value ?? '2', 10)
+    currentIdx = Math.min(currentIdx + speed, coords.length - 1)
+    updateCamera(currentIdx)
+    if (currentIdx < coords.length - 1) {
+      animFrame = requestAnimationFrame(playbackStep)
+    } else {
+      playing = false
+      const btn = document.getElementById('playPauseBtn')
+      if (btn) btn.textContent = '▶'
+    }
+  }
+
+  function togglePlay() {
+    if (playing) {
+      playing = false
+      cancelAnimationFrame(animFrame)
+      animFrame = null
+      const btn = document.getElementById('playPauseBtn')
+      if (btn) btn.textContent = '▶'
+    } else {
+      if (currentIdx >= coords.length - 1) currentIdx = 0
+      playing = true
+      const btn = document.getElementById('playPauseBtn')
+      if (btn) btn.textContent = '⏸'
+      animFrame = requestAnimationFrame(playbackStep)
+    }
+  }
+
   // Map mouse hover → sync chart
   map.on('mousemove', (e) => {
     let minDist = Infinity, closestIdx = 0
