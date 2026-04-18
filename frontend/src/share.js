@@ -207,4 +207,8 @@ export async function renderShare(app, uuid) {
       },
     },
   })
+
+  document.getElementById('chartToggleBtn').addEventListener('click', () => {
+    document.getElementById('chartPanel').classList.toggle('collapsed')
+  })
 }
