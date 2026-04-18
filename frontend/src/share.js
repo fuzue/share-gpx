@@ -352,4 +352,27 @@ export async function renderShare(app, uuid) {
   document.getElementById('chartToggleBtn').addEventListener('click', () => {
     document.getElementById('chartPanel').classList.toggle('collapsed')
   })
+
+  const scrubBar = document.getElementById('scrubBar')
+  scrubBar.max = coords.length - 1
+
+  let wasPlayingBeforeScrub = false
+  scrubBar.addEventListener('pointerdown', () => {
+    wasPlayingBeforeScrub = playing
+    if (playing) {
+      playing = false
+      cancelAnimationFrame(animFrame)
+      animFrame = null
+      document.getElementById('playPauseBtn').textContent = '▶'
+    }
+  })
+  scrubBar.addEventListener('input', () => {
+    currentIdx = parseInt(scrubBar.value, 10)
+    updateCamera(currentIdx)
+  })
+  scrubBar.addEventListener('pointerup', () => {
+    if (wasPlayingBeforeScrub) togglePlay()
+  })
+
+  document.getElementById('playPauseBtn').addEventListener('click', togglePlay)
 }
