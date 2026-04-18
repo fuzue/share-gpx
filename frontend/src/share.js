@@ -386,28 +386,25 @@ export async function renderShare(app, uuid) {
 
   let mode = '2d'
 
-  document.getElementById('toggleView').addEventListener('click', () => {
-    if (mode === '2d') {
-      mode = '3d'
-      document.getElementById('map').classList.add('hidden')
-      document.getElementById('map3d').classList.remove('hidden')
-      document.getElementById('playbackOverlay').classList.remove('hidden')
-      document.getElementById('toggleView').textContent = '2D'
-      initMap3D()
-      if (map3dReady) map3d.resize()
-    } else {
-      mode = '2d'
-      if (playing) {
-        playing = false
-        cancelAnimationFrame(animFrame)
-        animFrame = null
-        document.getElementById('playPauseBtn').textContent = '▶'
+  if (coords.length > 1) {
+    document.getElementById('toggleView').addEventListener('click', () => {
+      if (mode === '2d') {
+        mode = '3d'
+        document.getElementById('map').classList.add('hidden')
+        document.getElementById('map3d').classList.remove('hidden')
+        document.getElementById('playbackOverlay').classList.remove('hidden')
+        document.getElementById('toggleView').textContent = '2D'
+        initMap3D()
+        if (map3dReady) map3d.resize()
+      } else {
+        mode = '2d'
+        if (playing) togglePlay()
+        document.getElementById('map3d').classList.add('hidden')
+        document.getElementById('map').classList.remove('hidden')
+        document.getElementById('playbackOverlay').classList.add('hidden')
+        document.getElementById('toggleView').textContent = '3D'
+        map.invalidateSize()
       }
-      document.getElementById('map3d').classList.add('hidden')
-      document.getElementById('map').classList.remove('hidden')
-      document.getElementById('playbackOverlay').classList.add('hidden')
-      document.getElementById('toggleView').textContent = '3D'
-      map.invalidateSize()
-    }
-  })
+    })
+  }
 }
