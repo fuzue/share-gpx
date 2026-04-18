@@ -270,22 +270,31 @@ export async function renderShare(app, uuid) {
     if (positionLabel && elevProfile[idx]) {
       positionLabel.textContent = `${elevProfile[idx].dist_km.toFixed(2)} km · ${Math.round(elevProfile[idx].ele_m)} m`
     }
+    moveCursor(idx)
   }
 
   let playing = false
   let currentIdx = 0
   let animFrame = null
+  let playbackAccum = 0
+
+  // Points per second at each speed setting (1× ≈ 10 pts/sec feels like slow flythrough)
+  const PTS_PER_SEC = { '1': 10, '2': 25, '5': 60, '10': 150 }
 
   function playbackStep() {
-    const speed = parseInt(speedSelect?.value ?? '2', 10)
-    currentIdx = Math.min(currentIdx + speed, coords.length - 1)
-    updateCamera(currentIdx)
+    const pps = PTS_PER_SEC[speedSelect?.value] ?? 10
+    playbackAccum += pps / 60
+    const steps = Math.floor(playbackAccum)
+    if (steps > 0) {
+      playbackAccum -= steps
+      currentIdx = Math.min(currentIdx + steps, coords.length - 1)
+      updateCamera(currentIdx)
+    }
     if (currentIdx < coords.length - 1) {
       animFrame = requestAnimationFrame(playbackStep)
     } else {
       playing = false
-      const btn = playPauseBtn
-      if (btn) btn.textContent = '▶'
+      if (playPauseBtn) playPauseBtn.textContent = '▶'
     }
   }
 
@@ -298,6 +307,7 @@ export async function renderShare(app, uuid) {
       if (btn) btn.textContent = '▶'
     } else {
       if (currentIdx >= coords.length - 1) currentIdx = 0
+      playbackAccum = 0
       playing = true
       const btn = playPauseBtn
       if (btn) btn.textContent = '⏸'
