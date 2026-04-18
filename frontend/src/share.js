@@ -155,10 +155,15 @@ export async function renderShare(app, uuid) {
     if (map3dInitializing || map3dReady) return
     map3dInitializing = true
 
-    const lons = geoCoords.map(c => c[0])
-    const lats = geoCoords.map(c => c[1])
-    const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2
-    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2
+    let minLon = Infinity, maxLon = -Infinity, minLat = Infinity, maxLat = -Infinity
+    for (const [lon, lat] of geoCoords) {
+      if (lon < minLon) minLon = lon
+      if (lon > maxLon) maxLon = lon
+      if (lat < minLat) minLat = lat
+      if (lat > maxLat) maxLat = lat
+    }
+    const centerLon = (minLon + maxLon) / 2
+    const centerLat = (minLat + maxLat) / 2
 
     map3d = new maplibregl.Map({
       container: 'map3d',
@@ -216,6 +221,10 @@ export async function renderShare(app, uuid) {
       map3d.fitBounds(bounds, { padding: 60, pitch: 45, duration: 1000 })
 
       map3dReady = true
+      map3dInitializing = false
+    })
+
+    map3d.on('error', () => {
       map3dInitializing = false
     })
   }
