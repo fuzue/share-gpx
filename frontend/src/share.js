@@ -229,6 +229,29 @@ export async function renderShare(app, uuid) {
     })
   }
 
+  function updateCamera(idx) {
+    if (!map3dReady) return
+    const coord = geoCoords[idx]           // [lon, lat] — GeoJSON order
+    const ele = elevProfile[idx]?.ele_m ?? 0
+    const targetIdx = Math.min(idx + 3, geoCoords.length - 1)
+    const targetCoord = geoCoords[targetIdx]
+
+    const camera = map3d.getFreeCameraOptions()
+    camera.position = maplibregl.MercatorCoordinate.fromLngLat(
+      { lng: coord[0], lat: coord[1] },
+      ele + 30,
+    )
+    camera.lookAtPoint({ lng: targetCoord[0], lat: targetCoord[1] })
+    map3d.setFreeCameraOptions(camera)
+
+    const scrubBar = document.getElementById('scrubBar')
+    const positionLabel = document.getElementById('positionLabel')
+    if (scrubBar) scrubBar.value = idx
+    if (positionLabel && elevProfile[idx]) {
+      positionLabel.textContent = `${elevProfile[idx].dist_km.toFixed(2)} km · ${Math.round(elevProfile[idx].ele_m)} m`
+    }
+  }
+
   // Map mouse hover → sync chart
   map.on('mousemove', (e) => {
     let minDist = Infinity, closestIdx = 0
