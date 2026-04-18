@@ -18,11 +18,27 @@ L.Icon.Default.mergeOptions({
 export async function renderShare(app, uuid) {
   app.innerHTML = `
     <div class="share-wrapper">
-      <div id="map" class="map">
-        <div class="stats-overlay" id="statsOverlay"></div>
-        <div id="mapLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;pointer-events:none;color:#aaa;font-size:14px;">Loading trail…</div>
+      <div class="map-container">
+        <div id="map" class="map">
+          <div class="stats-overlay" id="statsOverlay"></div>
+          <div id="mapLoading" style="position:absolute;inset:0;display:flex;align-items:center;justify-content:center;z-index:1000;pointer-events:none;color:#aaa;font-size:14px;">Loading trail…</div>
+        </div>
+        <div id="map3d" class="map hidden"></div>
+        <button id="toggleView" class="toggle-view-btn">3D</button>
+        <div id="playbackOverlay" class="playback-overlay hidden">
+          <button id="playPauseBtn" class="play-pause-btn">▶</button>
+          <input id="scrubBar" type="range" min="0" value="0" class="scrub-bar">
+          <span id="positionLabel" class="position-label"></span>
+          <select id="speedSelect" class="speed-select">
+            <option value="1">1×</option>
+            <option value="2" selected>2×</option>
+            <option value="5">5×</option>
+            <option value="10">10×</option>
+          </select>
+        </div>
       </div>
-      <div class="chart-panel">
+      <div class="chart-panel" id="chartPanel">
+        <button id="chartToggleBtn" class="chart-toggle-btn" title="Toggle elevation chart">⌄</button>
         <canvas id="elevChart"></canvas>
       </div>
     </div>
