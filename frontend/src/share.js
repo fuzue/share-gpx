@@ -234,6 +234,7 @@ export async function renderShare(app, uuid) {
 
     map3d.on('error', () => {
       map3dInitializing = false
+      map3d = null
     })
   }
 
@@ -252,8 +253,6 @@ export async function renderShare(app, uuid) {
     camera.lookAtPoint({ lng: targetCoord[0], lat: targetCoord[1] })
     map3d.setFreeCameraOptions(camera)
 
-    const scrubBar = document.getElementById('scrubBar')
-    const positionLabel = document.getElementById('positionLabel')
     if (scrubBar) scrubBar.value = idx
     if (positionLabel && elevProfile[idx]) {
       positionLabel.textContent = `${elevProfile[idx].dist_km.toFixed(2)} km · ${Math.round(elevProfile[idx].ele_m)} m`
@@ -265,14 +264,14 @@ export async function renderShare(app, uuid) {
   let animFrame = null
 
   function playbackStep() {
-    const speed = parseInt(document.getElementById('speedSelect')?.value ?? '2', 10)
+    const speed = parseInt(speedSelect?.value ?? '2', 10)
     currentIdx = Math.min(currentIdx + speed, coords.length - 1)
     updateCamera(currentIdx)
     if (currentIdx < coords.length - 1) {
       animFrame = requestAnimationFrame(playbackStep)
     } else {
       playing = false
-      const btn = document.getElementById('playPauseBtn')
+      const btn = playPauseBtn
       if (btn) btn.textContent = '▶'
     }
   }
@@ -282,12 +281,12 @@ export async function renderShare(app, uuid) {
       playing = false
       cancelAnimationFrame(animFrame)
       animFrame = null
-      const btn = document.getElementById('playPauseBtn')
+      const btn = playPauseBtn
       if (btn) btn.textContent = '▶'
     } else {
       if (currentIdx >= coords.length - 1) currentIdx = 0
       playing = true
-      const btn = document.getElementById('playPauseBtn')
+      const btn = playPauseBtn
       if (btn) btn.textContent = '⏸'
       animFrame = requestAnimationFrame(playbackStep)
     }
@@ -363,6 +362,9 @@ export async function renderShare(app, uuid) {
 
   const scrubBar = document.getElementById('scrubBar')
   scrubBar.max = coords.length - 1
+  const positionLabel = document.getElementById('positionLabel')
+  const speedSelect = document.getElementById('speedSelect')
+  const playPauseBtn = document.getElementById('playPauseBtn')
 
   let wasPlayingBeforeScrub = false
   scrubBar.addEventListener('pointerdown', () => {
@@ -371,7 +373,7 @@ export async function renderShare(app, uuid) {
       playing = false
       cancelAnimationFrame(animFrame)
       animFrame = null
-      document.getElementById('playPauseBtn').textContent = '▶'
+      playPauseBtn.textContent = '▶'
     }
   })
   scrubBar.addEventListener('input', () => {
@@ -382,7 +384,7 @@ export async function renderShare(app, uuid) {
     if (wasPlayingBeforeScrub) togglePlay()
   })
 
-  document.getElementById('playPauseBtn').addEventListener('click', togglePlay)
+  playPauseBtn.addEventListener('click', togglePlay)
 
   let mode = '2d'
 
