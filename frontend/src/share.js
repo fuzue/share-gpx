@@ -175,7 +175,19 @@ export async function renderShare(app, uuid) {
 
     map3d = new maplibregl.Map({
       container: 'map3d',
-      style: 'https://tiles.openfreemap.org/styles/liberty',
+      style: {
+        version: 8,
+        sources: {
+          satellite: {
+            type: 'raster',
+            tiles: ['https://services.arcgisonline.com/ArcGIS/rest/services/World_Imagery/MapServer/tile/{z}/{y}/{x}'],
+            tileSize: 256,
+            attribution: '© Esri',
+            maxzoom: 19,
+          },
+        },
+        layers: [{ id: 'satellite', type: 'raster', source: 'satellite' }],
+      },
       center: [centerLon, centerLat],
       zoom: 12,
       pitch: 0,
@@ -240,18 +252,19 @@ export async function renderShare(app, uuid) {
 
   function updateCamera(idx) {
     if (!map3dReady) return
-    const coord = geoCoords[idx]           // [lon, lat] — GeoJSON order
-    const ele = elevProfile[idx]?.ele_m ?? 0
+    const coord = geoCoords[idx]
     const targetIdx = Math.min(idx + 3, geoCoords.length - 1)
     const targetCoord = geoCoords[targetIdx]
 
-    const camera = map3d.getFreeCameraOptions()
-    camera.position = maplibregl.MercatorCoordinate.fromLngLat(
-      { lng: coord[0], lat: coord[1] },
-      ele + 30,
-    )
-    camera.lookAtPoint({ lng: targetCoord[0], lat: targetCoord[1] })
-    map3d.setFreeCameraOptions(camera)
+    // Compute bearing toward the look-ahead point
+    const dLon = (targetCoord[0] - coord[0]) * Math.PI / 180
+    const lat1 = coord[1] * Math.PI / 180
+    const lat2 = targetCoord[1] * Math.PI / 180
+    const y = Math.sin(dLon) * Math.cos(lat2)
+    const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
+    const bear = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
+
+    map3d.jumpTo({ center: [coord[0], coord[1]], zoom: 16, bearing: bear, pitch: 75 })
 
     if (scrubBar) scrubBar.value = idx
     if (positionLabel && elevProfile[idx]) {
