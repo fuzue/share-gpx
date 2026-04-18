@@ -1,5 +1,7 @@
 import 'leaflet/dist/leaflet.css'
 import L from 'leaflet'
+import maplibregl from 'maplibre-gl'
+import 'maplibre-gl/dist/maplibre-gl.css'
 import { Chart, LineController, LineElement, PointElement, LinearScale, CategoryScale, Filler, Tooltip } from 'chart.js'
 import markerIcon from 'leaflet/dist/images/marker-icon.png'
 import markerIcon2x from 'leaflet/dist/images/marker-icon-2x.png'
@@ -64,6 +66,7 @@ export async function renderShare(app, uuid) {
   }).addTo(map)
 
   const coords = trail.geojson?.geometry?.coordinates?.map(([lon, lat]) => [lat, lon]) ?? []
+  const geoCoords = trail.geojson?.geometry?.coordinates ?? []
 
   if (coords.length === 0) {
     app.innerHTML = `<div class="error-page">Trail has no trackpoints.</div>`
@@ -142,6 +145,79 @@ export async function renderShare(app, uuid) {
       chart.tooltip.setActiveElements([], { x: 0, y: 0 })
       chart.update('none')
     }
+  }
+
+  let map3d = null
+  let map3dReady = false
+  let map3dInitializing = false
+
+  function initMap3D() {
+    if (map3dInitializing || map3dReady) return
+    map3dInitializing = true
+
+    const lons = geoCoords.map(c => c[0])
+    const lats = geoCoords.map(c => c[1])
+    const centerLon = (Math.min(...lons) + Math.max(...lons)) / 2
+    const centerLat = (Math.min(...lats) + Math.max(...lats)) / 2
+
+    map3d = new maplibregl.Map({
+      container: 'map3d',
+      style: 'https://tiles.openfreemap.org/styles/liberty',
+      center: [centerLon, centerLat],
+      zoom: 12,
+      pitch: 0,
+      bearing: 0,
+      antialias: true,
+    })
+
+    map3d.on('load', () => {
+      map3d.resize()
+
+      map3d.addSource('terrain-dem', {
+        type: 'raster-dem',
+        encoding: 'terrarium',
+        tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
+        tileSize: 256,
+        maxzoom: 15,
+      })
+      map3d.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 })
+
+      map3d.addSource('track', {
+        type: 'geojson',
+        data: trail.geojson,
+      })
+      map3d.addLayer({
+        id: 'track-line',
+        type: 'line',
+        source: 'track',
+        paint: {
+          'line-color': '#e74c3c',
+          'line-width': 3,
+          'line-opacity': 0.9,
+        },
+      })
+
+      // Start marker (green)
+      new maplibregl.Marker({ color: '#27ae60' })
+        .setLngLat(geoCoords[0])
+        .setPopup(new maplibregl.Popup().setText('Start'))
+        .addTo(map3d)
+
+      // End marker (red)
+      new maplibregl.Marker({ color: '#e74c3c' })
+        .setLngLat(geoCoords[geoCoords.length - 1])
+        .setPopup(new maplibregl.Popup().setText('End'))
+        .addTo(map3d)
+
+      const bounds = geoCoords.reduce(
+        (b, c) => b.extend(c),
+        new maplibregl.LngLatBounds(geoCoords[0], geoCoords[0]),
+      )
+      map3d.fitBounds(bounds, { padding: 60, pitch: 45, duration: 1000 })
+
+      map3dReady = true
+      map3dInitializing = false
+    })
   }
 
   // Map mouse hover → sync chart
