@@ -132,6 +132,10 @@ body {
   display: none;
 }
 
+#map3d {
+  touch-action: none;
+}
+
 .stats-overlay {
   position: absolute;
   top: 12px;

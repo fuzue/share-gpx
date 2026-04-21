@@ -58,6 +58,7 @@ export async function renderShare(app, uuid) {
 
   document.getElementById('mapLoading')?.remove()
   document.title = trail.filename || 'GPX Trail'
+  const initParams = new URLSearchParams(window.location.search)
 
   const map = L.map('map')
   L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
@@ -136,6 +137,7 @@ export async function renderShare(app, uuid) {
       cursorInfo.style.display = 'block'
     }
     if (chart) {
+      chartCursorIdx = idx
       const meta = chart.getDatasetMeta(0)
       const pt = meta.data[idx]
       chart.tooltip.setActiveElements(
@@ -150,6 +152,7 @@ export async function renderShare(app, uuid) {
     cursorMarker.setStyle({ opacity: 0, fillOpacity: 0 })
     cursorInfo.style.display = 'none'
     if (chart) {
+      chartCursorIdx = null
       chart.tooltip.setActiveElements([], { x: 0, y: 0 })
       chart.update('none')
     }
@@ -158,6 +161,10 @@ export async function renderShare(app, uuid) {
   let map3d = null
   let map3dReady = false
   let map3dInitializing = false
+  let cameraBearingOffset = 0
+  let cameraPitch = 75
+  let posMarker3d = null
+  let cameraZoom = 16
 
   function initMap3D() {
     if (map3dInitializing || map3dReady) return
@@ -193,25 +200,36 @@ export async function renderShare(app, uuid) {
       pitch: 0,
       bearing: 0,
       antialias: true,
+      maxPitch: 85,
     })
 
     map3d.on('load', () => {
-      map3d.resize()
+      const m = map3d  // local ref — immune to error handler setting map3d = null
+      m.resize()
 
-      map3d.addSource('terrain-dem', {
+      m.setSky({
+        'sky-color': '#4a9fd4',
+        'horizon-color': '#b8d8f0',
+        'fog-color': '#d4e8f5',
+        'fog-ground-blend': 0.5,
+        'sky-horizon-blend': 0.4,
+        'atmosphere-blend': 0.8,
+      })
+
+      m.addSource('terrain-dem', {
         type: 'raster-dem',
         encoding: 'terrarium',
         tiles: ['https://s3.amazonaws.com/elevation-tiles-prod/terrarium/{z}/{x}/{y}.png'],
         tileSize: 256,
         maxzoom: 15,
       })
-      map3d.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 })
+      m.setTerrain({ source: 'terrain-dem', exaggeration: 1.5 })
 
-      map3d.addSource('track', {
+      m.addSource('track', {
         type: 'geojson',
         data: trail.geojson,
       })
-      map3d.addLayer({
+      m.addLayer({
         id: 'track-line',
         type: 'line',
         source: 'track',
@@ -222,26 +240,137 @@ export async function renderShare(app, uuid) {
         },
       })
 
-      // Start marker (green)
-      new maplibregl.Marker({ color: '#27ae60' })
+      // Arrow marker showing current playback position and travel direction
+      const arrowEl = document.createElement('div')
+      arrowEl.innerHTML = `<svg width="28" height="28" viewBox="0 0 28 28" xmlns="http://www.w3.org/2000/svg"><circle cx="14" cy="14" r="12" fill="#f39c12" stroke="white" stroke-width="2"/><polygon points="14,4 20,18 14,13 8,18" fill="white"/></svg>`
+      arrowEl.style.cssText = 'pointer-events:none;filter:drop-shadow(0 1px 3px rgba(0,0,0,0.8));'
+      posMarker3d = new maplibregl.Marker({ element: arrowEl, rotationAlignment: 'map', pitchAlignment: 'map' })
         .setLngLat(geoCoords[0])
-        .setPopup(new maplibregl.Popup().setText('Start'))
-        .addTo(map3d)
+        .addTo(m)
 
-      // End marker (red)
-      new maplibregl.Marker({ color: '#e74c3c' })
-        .setLngLat(geoCoords[geoCoords.length - 1])
-        .setPopup(new maplibregl.Popup().setText('End'))
-        .addTo(map3d)
+      // Place markers after first idle so terrain elevation is queryable
+      m.once('idle', () => {
+        const startEle = m.queryTerrainElevation(geoCoords[0]) ?? 0
+        const endEle = m.queryTerrainElevation(geoCoords[geoCoords.length - 1]) ?? 0
+        new maplibregl.Marker({ color: '#27ae60' })
+          .setLngLat([geoCoords[0][0], geoCoords[0][1], startEle])
+          .setPopup(new maplibregl.Popup().setText('Start'))
+          .addTo(m)
+        new maplibregl.Marker({ color: '#e74c3c' })
+          .setLngLat([geoCoords[geoCoords.length - 1][0], geoCoords[geoCoords.length - 1][1], endEle])
+          .setPopup(new maplibregl.Popup().setText('End'))
+          .addTo(m)
+      })
 
       const bounds = geoCoords.reduce(
         (b, c) => b.extend(c),
         new maplibregl.LngLatBounds(geoCoords[0], geoCoords[0]),
       )
-      map3d.fitBounds(bounds, { padding: 60, pitch: 45, duration: 1000 })
+      // cameraForBounds is synchronous — no race with fitBounds/easeTo
+      const overviewCam = m.cameraForBounds(bounds, { padding: 60 }) ?? { center: { lng: centerLon, lat: centerLat }, zoom: 12 }
+
+      if (initParams.has('bearing') || initParams.has('idx')) {
+        const savedBearing = initParams.has('bearing') ? parseFloat(initParams.get('bearing')) : 0
+        if (initParams.has('pitch')) cameraPitch = parseFloat(initParams.get('pitch'))
+        if (initParams.has('zoom')) cameraZoom = Math.max(13, parseFloat(initParams.get('zoom')))
+        if (initParams.has('idx')) {
+          // Follow-cam: center on trail point with full saved camera state
+          const coord = geoCoords[currentIdx]
+          const ti = Math.min(currentIdx + 3, geoCoords.length - 1)
+          const tc = geoCoords[ti]
+          const dLon = (tc[0] - coord[0]) * Math.PI / 180
+          const φ1 = coord[1] * Math.PI / 180, φ2 = tc[1] * Math.PI / 180
+          const trailBear = (Math.atan2(Math.sin(dLon) * Math.cos(φ2), Math.cos(φ1) * Math.sin(φ2) - Math.sin(φ1) * Math.cos(φ2) * Math.cos(dLon)) * 180 / Math.PI + 360) % 360
+          cameraBearingOffset = ((savedBearing - trailBear) + 360) % 360
+          if (posMarker3d) posMarker3d.setLngLat([coord[0], coord[1]])
+          if (positionLabel && elevProfile[currentIdx]) {
+            positionLabel.textContent = `${elevProfile[currentIdx].dist_km.toFixed(2)} km · ${Math.round(elevProfile[currentIdx].ele_m)} m`
+          }
+          moveCursor(currentIdx)
+          m.jumpTo({ center: [coord[0], coord[1]], bearing: savedBearing, pitch: cameraPitch, zoom: cameraZoom })
+        } else {
+          // Overview with saved camera — use overview zoom (safe distance) but restore pitch/bearing
+          cameraBearingOffset = savedBearing
+          m.jumpTo({ center: [overviewCam.center.lng, overviewCam.center.lat], zoom: overviewCam.zoom, bearing: savedBearing, pitch: cameraPitch })
+        }
+      } else {
+        // No URL params — default trail overview
+        m.jumpTo({ center: [overviewCam.center.lng, overviewCam.center.lat], zoom: overviewCam.zoom, pitch: 0, bearing: 0 })
+      }
 
       map3dReady = true
       map3dInitializing = false
+
+      // Disable all built-in interactions; we handle everything ourselves
+      m.dragPan.disable()
+      m.dragRotate.disable()
+      m.touchZoomRotate.disable()
+      m.touchPitch.disable()
+      m.scrollZoom.disable()
+
+      // Pointer events: single-finger = bearing/pitch, two-finger = pinch zoom
+      const map3dEl = document.getElementById('map3d')
+      const activePointers = new Map()
+      let dragPt = null
+      let pinchState = null
+
+      map3dEl.addEventListener('pointerdown', e => {
+        e.preventDefault()
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        map3dEl.setPointerCapture(e.pointerId)
+        if (activePointers.size === 1) {
+          dragPt = { x: e.clientX, y: e.clientY, bearing: cameraBearingOffset, pitch: cameraPitch }
+          pinchState = null
+        } else if (activePointers.size === 2) {
+          dragPt = null
+          const [a, b] = [...activePointers.values()]
+          pinchState = { dist: Math.hypot(b.x - a.x, b.y - a.y), zoom: cameraZoom }
+        }
+      }, { passive: false })
+
+      map3dEl.addEventListener('pointermove', e => {
+        e.preventDefault()
+        activePointers.set(e.pointerId, { x: e.clientX, y: e.clientY })
+        if (activePointers.size === 2 && pinchState) {
+          const [a, b] = [...activePointers.values()]
+          const dist = Math.hypot(b.x - a.x, b.y - a.y)
+          cameraZoom = Math.max(13, Math.min(20, pinchState.zoom + Math.log2(dist / pinchState.dist)))
+          if (playing) updateCamera(currentIdx)
+          else map3d.jumpTo({ zoom: cameraZoom })
+        } else if (dragPt) {
+          const dx = e.clientX - dragPt.x
+          const dy = e.clientY - dragPt.y
+          cameraBearingOffset = ((dragPt.bearing - dx * 0.4) % 360 + 360) % 360
+          cameraPitch = Math.max(0, Math.min(85, dragPt.pitch - dy * 0.3))
+          if (playing) updateCamera(currentIdx)
+          else map3d.jumpTo({ bearing: cameraBearingOffset, pitch: cameraPitch })
+        }
+      }, { passive: false })
+
+      map3dEl.addEventListener('pointerup', e => {
+        activePointers.delete(e.pointerId)
+        map3dEl.releasePointerCapture(e.pointerId)
+        if (activePointers.size === 0) { dragPt = null; pinchState = null; updateURL() }
+        else if (activePointers.size === 1) {
+          pinchState = null
+          const [pt] = [...activePointers.values()]
+          dragPt = { x: pt.x, y: pt.y, bearing: cameraBearingOffset, pitch: cameraPitch }
+        }
+      })
+      map3dEl.addEventListener('pointercancel', e => {
+        activePointers.delete(e.pointerId)
+        if (activePointers.size === 0) { dragPt = null; pinchState = null }
+      })
+
+      // Scroll wheel zoom (desktop)
+      map3dEl.addEventListener('wheel', e => {
+        cameraZoom = Math.max(13, Math.min(20, cameraZoom - e.deltaY * 0.005))
+        if (playing) updateCamera(currentIdx)
+        else map3d.jumpTo({ zoom: cameraZoom })
+        clearTimeout(wheelTimer)
+        wheelTimer = setTimeout(updateURL, 400)
+        e.preventDefault()
+      }, { passive: false })
     })
 
     map3d.on('error', () => {
@@ -264,7 +393,12 @@ export async function renderShare(app, uuid) {
     const x = Math.cos(lat1) * Math.sin(lat2) - Math.sin(lat1) * Math.cos(lat2) * Math.cos(dLon)
     const bear = (Math.atan2(y, x) * 180 / Math.PI + 360) % 360
 
-    map3d.jumpTo({ center: [coord[0], coord[1]], zoom: 16, bearing: bear, pitch: 75 })
+    map3d.jumpTo({ center: [coord[0], coord[1]], zoom: cameraZoom, bearing: (bear + cameraBearingOffset) % 360, pitch: cameraPitch })
+
+    if (posMarker3d) {
+      posMarker3d.setLngLat([coord[0], coord[1]])
+      posMarker3d.setRotation(bear)
+    }
 
     if (scrubBar) scrubBar.value = idx
     if (positionLabel && elevProfile[idx]) {
@@ -305,12 +439,14 @@ export async function renderShare(app, uuid) {
       animFrame = null
       const btn = playPauseBtn
       if (btn) btn.textContent = '▶'
+      updateURL()
     } else {
       if (currentIdx >= coords.length - 1) currentIdx = 0
       playbackAccum = 0
       playing = true
       const btn = playPauseBtn
       if (btn) btn.textContent = '⏸'
+      updateCamera(currentIdx)
       animFrame = requestAnimationFrame(playbackStep)
     }
   }
@@ -326,10 +462,30 @@ export async function renderShare(app, uuid) {
   })
   map.on('mouseout', hideCursor)
 
+  // Vertical cursor line drawn on the chart at the active index
+  let chartCursorIdx = null
+  const chartCursorPlugin = {
+    id: 'cursorLine',
+    afterDraw(ch) {
+      if (chartCursorIdx == null) return
+      const { ctx, chartArea: { top, bottom }, scales: { x } } = ch
+      const xPx = x.getPixelForValue(chartCursorIdx)
+      ctx.save()
+      ctx.beginPath()
+      ctx.moveTo(xPx, top)
+      ctx.lineTo(xPx, bottom)
+      ctx.strokeStyle = '#f39c12'
+      ctx.lineWidth = 2
+      ctx.stroke()
+      ctx.restore()
+    },
+  }
+
   const labels = elevProfile.map(p => p.dist_km.toFixed(1))
   const data = elevProfile.map(p => p.ele_m)
 
   chart = new Chart(document.getElementById('elevChart'), {
+    plugins: [chartCursorPlugin],
     type: 'line',
     data: {
       labels,
@@ -381,6 +537,7 @@ export async function renderShare(app, uuid) {
 
   document.getElementById('chartToggleBtn').addEventListener('click', () => {
     document.getElementById('chartPanel').classList.toggle('collapsed')
+    updateURL()
   })
 
   const scrubBar = document.getElementById('scrubBar')
@@ -405,11 +562,28 @@ export async function renderShare(app, uuid) {
   })
   scrubBar.addEventListener('pointerup', () => {
     if (wasPlayingBeforeScrub) togglePlay()
+    else updateURL()
   })
 
   playPauseBtn.addEventListener('click', togglePlay)
 
   let mode = '2d'
+  let wheelTimer = null
+
+  function updateURL() {
+    const params = new URLSearchParams()
+    if (mode === '3d') {
+      params.set('view', '3d')
+      params.set('bearing', (map3d && map3dReady) ? Math.round(map3d.getBearing()) : Math.round(cameraBearingOffset))
+      params.set('pitch', Math.round(cameraPitch))
+      params.set('zoom', cameraZoom.toFixed(1))
+      if (currentIdx > 0) params.set('idx', currentIdx)
+    }
+    if (document.getElementById('chartPanel').classList.contains('collapsed')) params.set('chart', '0')
+    const url = new URL(window.location.href)
+    url.search = params.toString()
+    history.replaceState(null, '', url)
+  }
 
   if (coords.length > 1) {
     document.getElementById('toggleView').addEventListener('click', () => {
@@ -421,6 +595,7 @@ export async function renderShare(app, uuid) {
         document.getElementById('toggleView').textContent = '2D'
         initMap3D()
         if (map3dReady) map3d.resize()
+        updateURL()
       } else {
         mode = '2d'
         if (playing) togglePlay()
@@ -429,7 +604,25 @@ export async function renderShare(app, uuid) {
         document.getElementById('playbackOverlay').classList.add('hidden')
         document.getElementById('toggleView').textContent = '3D'
         map.invalidateSize()
+        updateURL()
       }
     })
+  }
+
+  // Restore UI state from URL params
+  if (initParams.get('view') === '3d' && coords.length > 1) {
+    if (initParams.has('idx')) {
+      currentIdx = Math.min(parseInt(initParams.get('idx'), 10) || 0, coords.length - 1)
+      scrubBar.value = currentIdx
+    }
+    mode = '3d'
+    document.getElementById('map').classList.add('hidden')
+    document.getElementById('map3d').classList.remove('hidden')
+    document.getElementById('playbackOverlay').classList.remove('hidden')
+    document.getElementById('toggleView').textContent = '2D'
+    initMap3D()
+  }
+  if (initParams.get('chart') === '0') {
+    document.getElementById('chartPanel').classList.add('collapsed')
   }
 }

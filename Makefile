@@ -10,4 +10,4 @@ test:
 	go test ./...
 
 run: build
-	API_KEY=dev DATA_DIR=/tmp/share-gpx-dev PORT=8080 PUBLIC_URL=http://localhost:8080 ./share-gpx
+	API_KEY=dev DATA_DIR=/tmp/share-gpx-dev PORT=8087 PUBLIC_URL=http://localhost:8087 ./share-gpx
