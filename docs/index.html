@@ -1,0 +1,585 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>share-gpx — Self-hosted GPX trail sharing</title>
+  <meta name="description" content="A self-hosted service for sharing GPX trails with interactive 2D maps, elevation profiles, and 3D terrain flythroughs." />
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg: #0f1117;
+      --bg2: #181c27;
+      --bg3: #1e2436;
+      --border: #2a3050;
+      --text: #e8eaf0;
+      --muted: #8b93b0;
+      --accent: #4f7cff;
+      --accent2: #3ecf8e;
+      --red: #e05252;
+      --radius: 10px;
+      --font: 'Inter', system-ui, -apple-system, sans-serif;
+      --mono: 'JetBrains Mono', 'Fira Code', monospace;
+    }
+
+    body {
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      line-height: 1.6;
+    }
+
+    a { color: var(--accent); text-decoration: none; }
+    a:hover { text-decoration: underline; }
+
+    /* NAV */
+    nav {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 1rem 2rem;
+      border-bottom: 1px solid var(--border);
+      position: sticky;
+      top: 0;
+      background: var(--bg);
+      z-index: 100;
+    }
+    .nav-logo {
+      font-size: 1.1rem;
+      font-weight: 700;
+      color: var(--text);
+      letter-spacing: -0.02em;
+    }
+    .nav-logo span { color: var(--accent); }
+    .nav-links { display: flex; gap: 1.5rem; font-size: 0.9rem; color: var(--muted); }
+    .nav-links a { color: var(--muted); }
+    .nav-links a:hover { color: var(--text); text-decoration: none; }
+    .nav-cta {
+      background: var(--accent);
+      color: #fff !important;
+      padding: 0.4rem 1rem;
+      border-radius: 6px;
+      font-weight: 600;
+      font-size: 0.85rem;
+    }
+    .nav-cta:hover { background: #3a6de8; text-decoration: none !important; }
+
+    /* HERO */
+    .hero {
+      max-width: 900px;
+      margin: 0 auto;
+      padding: 5rem 2rem 3rem;
+      text-align: center;
+    }
+    .hero-badge {
+      display: inline-block;
+      background: rgba(79,124,255,0.12);
+      border: 1px solid rgba(79,124,255,0.3);
+      color: var(--accent);
+      font-size: 0.78rem;
+      font-weight: 600;
+      padding: 0.25rem 0.75rem;
+      border-radius: 100px;
+      margin-bottom: 1.5rem;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+    }
+    h1 {
+      font-size: clamp(2.2rem, 5vw, 3.8rem);
+      font-weight: 800;
+      letter-spacing: -0.03em;
+      line-height: 1.1;
+      margin-bottom: 1.25rem;
+    }
+    h1 .highlight { color: var(--accent); }
+    .hero-sub {
+      font-size: 1.15rem;
+      color: var(--muted);
+      max-width: 580px;
+      margin: 0 auto 2.5rem;
+    }
+    .hero-actions { display: flex; gap: 1rem; justify-content: center; flex-wrap: wrap; }
+    .btn {
+      display: inline-block;
+      padding: 0.7rem 1.6rem;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.95rem;
+      transition: opacity 0.15s;
+    }
+    .btn:hover { opacity: 0.85; text-decoration: none; }
+    .btn-primary { background: var(--accent); color: #fff; }
+    .btn-secondary {
+      background: var(--bg3);
+      color: var(--text);
+      border: 1px solid var(--border);
+    }
+
+    /* SCREENSHOT */
+    .screenshot-wrap {
+      max-width: 960px;
+      margin: 3rem auto 0;
+      padding: 0 2rem;
+    }
+    .screenshot-wrap img {
+      width: 100%;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      box-shadow: 0 24px 80px rgba(0,0,0,0.5);
+    }
+
+    /* SECTION */
+    section {
+      max-width: 960px;
+      margin: 0 auto;
+      padding: 5rem 2rem;
+    }
+    .section-label {
+      font-size: 0.78rem;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.1em;
+      color: var(--accent);
+      margin-bottom: 0.75rem;
+    }
+    h2 {
+      font-size: clamp(1.6rem, 3vw, 2.2rem);
+      font-weight: 800;
+      letter-spacing: -0.02em;
+      margin-bottom: 1rem;
+    }
+    .section-desc {
+      color: var(--muted);
+      font-size: 1.05rem;
+      max-width: 560px;
+      margin-bottom: 3rem;
+    }
+
+    /* FEATURES GRID */
+    .features {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+      gap: 1.25rem;
+    }
+    .feature-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.5rem;
+      transition: border-color 0.2s;
+    }
+    .feature-card:hover { border-color: rgba(79,124,255,0.4); }
+    .feature-icon {
+      font-size: 1.6rem;
+      margin-bottom: 0.75rem;
+    }
+    .feature-card h3 {
+      font-size: 1rem;
+      font-weight: 700;
+      margin-bottom: 0.4rem;
+    }
+    .feature-card p { font-size: 0.88rem; color: var(--muted); line-height: 1.5; }
+
+    /* HOW IT WORKS */
+    .steps { display: grid; gap: 2rem; counter-reset: step; }
+    .step {
+      display: flex;
+      gap: 1.5rem;
+      align-items: flex-start;
+    }
+    .step-num {
+      flex-shrink: 0;
+      width: 2.2rem;
+      height: 2.2rem;
+      border-radius: 50%;
+      background: rgba(79,124,255,0.15);
+      border: 1px solid rgba(79,124,255,0.35);
+      color: var(--accent);
+      font-weight: 700;
+      font-size: 0.9rem;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    .step-body h3 { font-size: 1rem; font-weight: 700; margin-bottom: 0.3rem; }
+    .step-body p { font-size: 0.9rem; color: var(--muted); }
+
+    /* CODE BLOCKS */
+    .code-section { background: var(--bg2); border-radius: var(--radius); border: 1px solid var(--border); overflow: hidden; }
+    .code-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 0.6rem 1rem;
+      border-bottom: 1px solid var(--border);
+      font-size: 0.78rem;
+      color: var(--muted);
+      font-weight: 600;
+    }
+    .code-dots { display: flex; gap: 6px; }
+    .code-dots span { width: 10px; height: 10px; border-radius: 50%; background: var(--border); }
+    pre {
+      padding: 1.25rem 1.5rem;
+      overflow-x: auto;
+      font-family: var(--mono);
+      font-size: 0.85rem;
+      line-height: 1.7;
+    }
+    .token-comment { color: #5a6480; }
+    .token-cmd { color: #4f7cff; }
+    .token-string { color: #3ecf8e; }
+    .token-key { color: #f9a557; }
+
+    /* CONFIG TABLE */
+    .config-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 0.88rem;
+    }
+    .config-table th {
+      text-align: left;
+      padding: 0.6rem 1rem;
+      color: var(--muted);
+      font-size: 0.78rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.05em;
+      border-bottom: 1px solid var(--border);
+    }
+    .config-table td {
+      padding: 0.75rem 1rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+    .config-table tr:last-child td { border-bottom: none; }
+    .badge-required {
+      background: rgba(224,82,82,0.15);
+      border: 1px solid rgba(224,82,82,0.3);
+      color: var(--red);
+      font-size: 0.72rem;
+      padding: 0.1rem 0.4rem;
+      border-radius: 4px;
+      font-weight: 600;
+    }
+    code {
+      font-family: var(--mono);
+      background: var(--bg3);
+      border: 1px solid var(--border);
+      padding: 0.1em 0.4em;
+      border-radius: 4px;
+      font-size: 0.85em;
+    }
+
+    /* TECH STACK */
+    .tech-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+      gap: 1rem;
+    }
+    .tech-card {
+      background: var(--bg2);
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      padding: 1.25rem;
+    }
+    .tech-card .label { font-size: 0.75rem; font-weight: 600; color: var(--muted); text-transform: uppercase; letter-spacing: 0.06em; margin-bottom: 0.75rem; }
+    .tech-card .items { display: flex; flex-direction: column; gap: 0.4rem; font-size: 0.9rem; }
+    .tech-card .items span { color: var(--text); }
+    .tech-card .items small { color: var(--muted); font-size: 0.8rem; }
+
+    /* CTA SECTION */
+    .cta-section {
+      background: var(--bg2);
+      border-top: 1px solid var(--border);
+      border-bottom: 1px solid var(--border);
+    }
+    .cta-inner {
+      max-width: 700px;
+      margin: 0 auto;
+      padding: 5rem 2rem;
+      text-align: center;
+    }
+    .cta-inner h2 { margin-bottom: 1rem; }
+    .cta-inner p { color: var(--muted); margin-bottom: 2rem; }
+
+    /* FOOTER */
+    footer {
+      text-align: center;
+      padding: 2rem;
+      color: var(--muted);
+      font-size: 0.85rem;
+      border-top: 1px solid var(--border);
+    }
+    footer a { color: var(--muted); }
+    footer a:hover { color: var(--text); }
+
+    /* DIVIDER */
+    .divider { border: none; border-top: 1px solid var(--border); }
+
+    @media (max-width: 600px) {
+      nav { padding: 1rem; }
+      .nav-links { display: none; }
+      .hero { padding: 3rem 1.25rem 2rem; }
+      section { padding: 3rem 1.25rem; }
+    }
+  </style>
+</head>
+<body>
+
+<nav>
+  <div class="nav-logo">share<span>-gpx</span></div>
+  <div class="nav-links">
+    <a href="#features">Features</a>
+    <a href="#install">Install</a>
+    <a href="#config">Config</a>
+    <a href="https://github.com/fuzue/share-gpx">GitHub</a>
+    <a class="nav-cta" href="https://github.com/fuzue/share-gpx">Get Started</a>
+  </div>
+</nav>
+
+<div class="hero">
+  <div class="hero-badge">Open Source &amp; Self-Hosted</div>
+  <h1>Share your trails<br>with <span class="highlight">beautiful maps</span></h1>
+  <p class="hero-sub">
+    Upload a GPX file, get a shareable link. Interactive 2D maps, elevation profiles,
+    and 3D terrain flythroughs — all in a single Go binary.
+  </p>
+  <div class="hero-actions">
+    <a class="btn btn-primary" href="https://github.com/fuzue/share-gpx">View on GitHub</a>
+    <a class="btn btn-secondary" href="#install">Quick Install</a>
+  </div>
+</div>
+
+<div class="screenshot-wrap">
+  <img src="share-gpx-3d.gif" alt="share-gpx 3D terrain flythrough with first-person playback" />
+</div>
+
+<!-- FEATURES -->
+<section id="features">
+  <div class="section-label">Features</div>
+  <h2>Everything you need to share a trail</h2>
+  <p class="section-desc">No third-party services. No accounts. Just a URL.</p>
+
+  <div class="features">
+    <div class="feature-card">
+      <div class="feature-icon">🗺️</div>
+      <h3>Interactive 2D Map</h3>
+      <p>OpenStreetMap-powered map with the trail rendered as a polyline. Hover to see elevation and distance at any point.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🏔️</div>
+      <h3>3D Terrain View</h3>
+      <p>WebGL terrain rendering with satellite, topographic, street, and dark basemap styles. Real elevation data, 1.5× exaggerated for impact.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">▶️</div>
+      <h3>First-Person Playback</h3>
+      <p>Animated camera follows the trail at 1×, 2×, 5×, or 10× speed. Scrub to any position along the route.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📊</div>
+      <h3>Elevation Profile</h3>
+      <p>Chart.js elevation profile synced with the map cursor. Collapsible panel keeps the map front and centre.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📍</div>
+      <h3>Trail Statistics</h3>
+      <p>Distance (Haversine), total elevation gain, and duration (when GPX timestamps are present) shown at a glance.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🔗</div>
+      <h3>Persistent Share URLs</h3>
+      <p>Each trail gets a UUID-based URL. Map position, 3D mode, and playback state are encoded in query params for bookmarking.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">📤</div>
+      <h3>Drag-and-Drop Upload</h3>
+      <p>Simple web UI with API key stored in browser storage. Or use <code>curl</code> for scripted uploads.</p>
+    </div>
+    <div class="feature-card">
+      <div class="feature-icon">🚀</div>
+      <h3>Single Binary Deploy</h3>
+      <p>Go backend embeds the built frontend. Drop one binary, set one env var, done. SQLite for metadata, filesystem for GPX files.</p>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- HOW IT WORKS -->
+<section>
+  <div class="section-label">How it works</div>
+  <h2>Upload. Share. Explore.</h2>
+  <p class="section-desc">Three steps from GPX file to 3D terrain flythrough.</p>
+
+  <div class="steps">
+    <div class="step">
+      <div class="step-num">1</div>
+      <div class="step-body">
+        <h3>Upload your GPX file</h3>
+        <p>Drag and drop onto the web UI or <code>curl -F file=@trail.gpx</code> to the <code>/upload</code> endpoint with your API key. The server stores the file and returns a unique URL.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">2</div>
+      <div class="step-body">
+        <h3>Get a shareable link</h3>
+        <p>A UUID-based URL like <code>https://trails.example.com/550e8400-...</code> is yours instantly. Send it to anyone — no account required to view.</p>
+      </div>
+    </div>
+    <div class="step">
+      <div class="step-num">3</div>
+      <div class="step-body">
+        <h3>Explore in 2D or 3D</h3>
+        <p>Viewers see an interactive map with elevation profile. Switch to 3D mode for a first-person terrain flythrough with playback controls.</p>
+      </div>
+    </div>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- INSTALL -->
+<section id="install">
+  <div class="section-label">Installation</div>
+  <h2>Up and running in minutes</h2>
+  <p class="section-desc">Requires Go 1.21+ and Node.js 16+ to build from source.</p>
+
+  <div class="code-section">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span>bash</span>
+    </div>
+    <pre><span class="token-comment"># Clone and build</span>
+<span class="token-cmd">git clone</span> <span class="token-string">https://github.com/fuzue/share-gpx</span>
+<span class="token-cmd">cd</span> share-gpx
+<span class="token-cmd">make</span> build
+
+<span class="token-comment"># Run the server</span>
+<span class="token-key">API_KEY</span>=your-secret-key ./share-gpx
+
+<span class="token-comment"># Open http://localhost:8080 in your browser</span></pre>
+  </div>
+
+  <br />
+
+  <div class="code-section">
+    <div class="code-header">
+      <div class="code-dots"><span></span><span></span><span></span></div>
+      <span>Upload via curl</span>
+    </div>
+    <pre><span class="token-cmd">curl</span> -X POST https://your-domain.com/upload \
+  -H <span class="token-string">"X-API-Key: your-secret-key"</span> \
+  -F <span class="token-string">"file=@trail.gpx"</span>
+
+<span class="token-comment"># {"url":"https://your-domain.com/550e8400-e29b-41d4-a716-446655440000"}</span></pre>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- CONFIG -->
+<section id="config">
+  <div class="section-label">Configuration</div>
+  <h2>Environment variables</h2>
+  <p class="section-desc">No config files. Everything is set via environment variables.</p>
+
+  <div class="code-section">
+    <table class="config-table">
+      <thead>
+        <tr>
+          <th>Variable</th>
+          <th>Default</th>
+          <th>Description</th>
+        </tr>
+      </thead>
+      <tbody>
+        <tr>
+          <td><code>API_KEY</code> <span class="badge-required">required</span></td>
+          <td>—</td>
+          <td>Secret key for the <code>/upload</code> endpoint. Use <code>openssl rand -hex 32</code> to generate one.</td>
+        </tr>
+        <tr>
+          <td><code>DATA_DIR</code></td>
+          <td><code>/data</code></td>
+          <td>Directory where GPX files and the SQLite database are stored. Must be writable.</td>
+        </tr>
+        <tr>
+          <td><code>PORT</code></td>
+          <td><code>8080</code></td>
+          <td>HTTP listen port.</td>
+        </tr>
+        <tr>
+          <td><code>PUBLIC_URL</code></td>
+          <td><code>http://localhost:{PORT}</code></td>
+          <td>Base URL returned in upload responses. Set this to your public domain.</td>
+        </tr>
+      </tbody>
+    </table>
+  </div>
+</section>
+
+<hr class="divider" />
+
+<!-- TECH STACK -->
+<section>
+  <div class="section-label">Tech Stack</div>
+  <h2>Built on solid foundations</h2>
+  <p class="section-desc">Carefully chosen dependencies that stay out of your way.</p>
+
+  <div class="tech-grid">
+    <div class="tech-card">
+      <div class="label">Backend</div>
+      <div class="items">
+        <span>Go <small>— single binary, fast startup</small></span>
+        <span>chi <small>— lightweight HTTP router</small></span>
+        <span>modernc/sqlite <small>— pure Go, no CGo</small></span>
+        <span>go:embed <small>— frontend bundled in binary</small></span>
+      </div>
+    </div>
+    <div class="tech-card">
+      <div class="label">Frontend</div>
+      <div class="items">
+        <span>Vite <small>— fast bundler</small></span>
+        <span>Leaflet <small>— 2D maps</small></span>
+        <span>MapLibre GL JS <small>— 3D WebGL terrain</small></span>
+        <span>Chart.js <small>— elevation profile</small></span>
+      </div>
+    </div>
+    <div class="tech-card">
+      <div class="label">Storage</div>
+      <div class="items">
+        <span>SQLite <small>— trail metadata</small></span>
+        <span>Filesystem <small>— raw GPX files</small></span>
+      </div>
+    </div>
+    <div class="tech-card">
+      <div class="label">Map Tiles</div>
+      <div class="items">
+        <span>OpenStreetMap <small>— 2D base map</small></span>
+        <span>ESRI Satellite <small>— aerial imagery</small></span>
+        <span>AWS Terrain <small>— elevation data</small></span>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- CTA -->
+<div class="cta-section">
+  <div class="cta-inner">
+    <h2>Ready to share your trails?</h2>
+    <p>Self-host in minutes. MIT licensed. No sign-up required.</p>
+    <div class="hero-actions">
+      <a class="btn btn-primary" href="https://github.com/fuzue/share-gpx">View on GitHub</a>
+      <a class="btn btn-secondary" href="#install">Installation Guide</a>
+    </div>
+  </div>
+</div>
+
+<footer>
+  <p>share-gpx &mdash; MIT License &mdash; <a href="https://github.com/fuzue/share-gpx">GitHub</a></p>
+</footer>
+
+</body>
+</html>
